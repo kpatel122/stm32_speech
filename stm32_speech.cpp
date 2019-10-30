@@ -27,7 +27,36 @@ OTHER DEALINGS IN THE SOFTWARE.
 #include <Arduino.h>
 #include "stm32_speech.h"
 
- 
+
+void CSpeech::update_voice_settings()
+{
+	options = "[x0][g2][h2][n1]"; //base values
+	for(int i=0;i<MAX_SPEECH_PARAMS;i++)
+	{
+		options +=voice_params[i];
+	}
+
+	//options = "[x0][t1][v5][s5]" + *current_voice + "[g2][h2][n1]";}//options = "[x0][t6][v5][s6]" + *current_voice + "[g2][h2][n1]";
+}
+
+void CSpeech::set_voice_type (VOICE_TYPE new_voice)
+{
+	voice_params[VOICE_TYPE_PARAM] = "[m"+ String(new_voice) +"]";
+}
+
+void CSpeech::set_voice_speed (byte new_speed)
+{
+	voice_params[VOICE_SPEED_PARAM] = "[s"+ String(new_speed) +"]";
+}
+void CSpeech::set_voice_tone (byte new_tone)
+{
+	voice_params[VOICE_TONE_PARAM] = "[t"+ String(new_tone) +"]";
+}
+void CSpeech::set_voice_volume (byte new_volume)
+{
+	voice_params[VOICE_VOLUME_PARAM] = "[v"+ String(new_volume) +"]";
+}
+
 void CSpeech::refresh_state()
 {
 	if(state == SPEECH_STATE_RUNNING)
@@ -44,10 +73,16 @@ void CSpeech::refresh_state()
 	}
 }
 
-CSpeech::CSpeech(int baud) 
+CSpeech::CSpeech(int baud, VOICE_TYPE voice_type)
 {
-  options = "[x0][t6][v5][s6][m51][g2][h2][n1]";
-  state = SPEECH_STATE_STOPPED;
+	set_voice_type (voice_type);
+	set_voice_speed (6);//default value
+	set_voice_tone(6);
+	set_voice_volume(5);
+	update_voice_settings();
+
+	//options = "[x0][t6][v5][s6]" + *current_voice + "[g2][h2][n1]";
+	state = SPEECH_STATE_STOPPED;
 }
  
 void CSpeech::speak(String message)
@@ -55,23 +90,27 @@ void CSpeech::speak(String message)
   
   messageString =options + message;
 
+
+
   // Length (with one extra character for the null terminator)
   stringLength = messageString.length() + 1; 
 
   // Copy it over 
   messageString.toCharArray(messageBuffer, stringLength);
-  sendMessagetoSpeechModule();
+  send_message_to_speech_module();
   state = SPEECH_STATE_RUNNING;
 }
 
-void CSpeech::sendMessagetoSpeechModule()
+void CSpeech::send_message_to_speech_module()
 {
-  Serial2.write(0xFD);
-  Serial2.write((byte)0x0);
-  Serial2.write(2 + strlen(messageBuffer));
-  Serial2.write(0x01);
-  Serial2.write((byte)0x0);
-  Serial2.write(messageBuffer);
+
+  Serial2.write(0xFD); //default
+  Serial2.write((byte)0x0); //size high byte
+  Serial2.write(2 + strlen(messageBuffer)); //size low byte
+  Serial2.write(0x01); //command -speech
+  Serial2.write((byte)0x0);//text encoding 0x00=GB2312 0x01=GBK 0x02=BIG5  0x03=UNICODE
+  Serial2.write(messageBuffer);//message data
+
 }
 
 void CSpeech::waitForSpeech(unsigned long timeout) {
